@@ -1,682 +1,535 @@
-import os
 import streamlit as st
 import pandas as pd
 import ydata_profiling
 from streamlit_pandas_profiling import st_profile_report
+import os
 
 from pycaret.classification import (
-    setup as clf_setup, compare_models as clf_compare_models, pull as clf_pull,
-    save_model as clf_save_model, predict_model as clf_predict_model,
-    get_config as clf_get_config, create_model as clf_create_model,
-    finalize_model as clf_finalize_model
+    setup as clf_setup,
+    compare_models as clf_compare_models,
+    pull as clf_pull,
+    save_model as clf_save_model,
+    predict_model as clf_predict_model,
+    get_config as clf_get_config,
+    create_model as clf_create_model,
+    finalize_model as clf_finalize_model,
 )
-
 from pycaret.regression import (
-    setup as reg_setup, compare_models as reg_compare_models, pull as reg_pull,
-    save_model as reg_save_model, predict_model as reg_predict_model,
-    get_config as reg_get_config, create_model as reg_create_model,
-    finalize_model as reg_finalize_model
+    setup as reg_setup,
+    compare_models as reg_compare_models,
+    pull as reg_pull,
+    save_model as reg_save_model,
+    predict_model as reg_predict_model,
+    get_config as reg_get_config,
+    create_model as reg_create_model,
+    finalize_model as reg_finalize_model,
 )
 
 from sklearn.metrics import (
-    confusion_matrix, accuracy_score, f1_score,
-    mean_squared_error, r2_score, mean_absolute_error
+    confusion_matrix,
+    accuracy_score,
+    f1_score,
+    mean_squared_error,
+    r2_score,
+    mean_absolute_error,
 )
 
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from openai import OpenAI
 from streamlit_chat import message
+from openai import OpenAI
 
 
-# =========================
+# =========================================================
 # إعداد الصفحة
-# =========================
-st.set_page_config(page_title="منصة النمذجة الآلية", layout="wide")
-
-# =========================
-# تنسيق RTL + واجهة هندسية احترافية
-# =========================
-st.markdown(
-    """
-    <style>
-    :root{
-        --bg0:#0b1220;
-        --bg1:#0f1a33;
-        --card:#0e1730;
-        --card2:#101c38;
-        --line:#223057;
-        --text:#e6edf6;
-        --muted:#a7b4cf;
-        --accent:#2dd4bf;   /* تركواز برمجي */
-        --accent2:#60a5fa;  /* أزرق */
-        --warn:#f59e0b;
-        --ok:#22c55e;
-        --danger:#ef4444;
-        --shadow: 0 12px 32px rgba(0,0,0,.35);
-        --radius: 16px;
-    }
-
-    html, body, [data-testid="stApp"]{
-        background: radial-gradient(1200px 700px at 80% -10%, rgba(96,165,250,.25), transparent 60%),
-                    radial-gradient(900px 500px at 20% 0%, rgba(45,212,191,.20), transparent 55%),
-                    linear-gradient(180deg, var(--bg0), var(--bg1));
-        color: var(--text);
-        direction: RTL;
-        text-align: right;
-        font-family: "Segoe UI", "Tahoma", sans-serif;
-    }
-
-    /* إخفاء شريط Streamlit الافتراضي */
-    header, footer {visibility: hidden;}
-    [data-testid="stToolbar"] {visibility: hidden;}
-
-    /* تحسين المسافات */
-    .block-container{
-        padding-top: 24px !important;
-        padding-bottom: 28px !important;
-    }
-
-    /* العناوين */
-    h1,h2,h3,h4{
-        letter-spacing: .2px;
-        color: var(--text);
-    }
-
-    /* الحاويات */
-    .app-shell{
-        border: 1px solid rgba(34,48,87,.7);
-        background: linear-gradient(180deg, rgba(14,23,48,.65), rgba(16,28,56,.45));
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 18px 18px 10px 18px;
-        margin-bottom: 16px;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .app-shell::before{
-        content:"";
-        position:absolute;
-        top:-120px; left:-120px;
-        width:240px; height:240px;
-        background: radial-gradient(circle, rgba(45,212,191,.22), transparent 60%);
-        filter: blur(2px);
-    }
-
-    .app-shell::after{
-        content:"";
-        position:absolute;
-        bottom:-140px; right:-140px;
-        width:280px; height:280px;
-        background: radial-gradient(circle, rgba(96,165,250,.20), transparent 60%);
-        filter: blur(2px);
-    }
-
-    .topbar{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:12px;
-        margin-bottom: 12px;
-        position: relative;
-        z-index: 1;
-    }
-
-    .brand{
-        display:flex;
-        flex-direction:column;
-        gap:4px;
-    }
-
-    .brand-title{
-        font-size: 22px;
-        font-weight: 700;
-        line-height: 1.2;
-    }
-
-    .brand-sub{
-        font-size: 13px;
-        color: var(--muted);
-    }
-
-    .badge{
-        display:inline-flex;
-        align-items:center;
-        gap:8px;
-        font-size: 12px;
-        color: var(--muted);
-        border: 1px solid rgba(34,48,87,.8);
-        background: rgba(14,23,48,.55);
-        padding: 8px 10px;
-        border-radius: 999px;
-        position: relative;
-        z-index: 1;
-        white-space: nowrap;
-    }
-
-    .dot{
-        width:10px;height:10px;border-radius:999px;
-        background: var(--accent);
-        box-shadow: 0 0 0 6px rgba(45,212,191,.10);
-    }
-
-    .grid{
-        display:grid;
-        grid-template-columns: repeat(12, 1fr);
-        gap: 12px;
-        position: relative;
-        z-index: 1;
-    }
-
-    .card{
-        border: 1px solid rgba(34,48,87,.75);
-        background: linear-gradient(180deg, rgba(14,23,48,.70), rgba(16,28,56,.55));
-        border-radius: var(--radius);
-        box-shadow: 0 10px 28px rgba(0,0,0,.25);
-        padding: 14px 14px;
-        overflow: hidden;
-    }
-
-    .card-title{
-        font-size: 14px;
-        color: var(--muted);
-        margin-bottom: 6px;
-    }
-
-    .card-value{
-        font-size: 18px;
-        font-weight: 700;
-    }
-
-    .hr{
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(34,48,87,.9), transparent);
-        margin: 10px 0 6px 0;
-    }
-
-    /* السايدبار */
-    [data-testid="stSidebar"]{
-        background: linear-gradient(180deg, rgba(11,18,32,.92), rgba(15,26,51,.92)) !important;
-        border-left: 1px solid rgba(34,48,87,.65);
-    }
-    [data-testid="stSidebar"] *{
-        color: var(--text) !important;
-    }
-
-    /* عناصر الإدخال RTL */
-    label, .stRadio, .stSelectbox, .stSlider, .stTextInput, .stTextArea{
-        direction: RTL !important;
-        text-align: right !important;
-    }
-
-    /* الأزرار */
-    .stButton>button{
-        width: 100%;
-        border-radius: 14px;
-        border: 1px solid rgba(34,48,87,.9);
-        background: linear-gradient(180deg, rgba(45,212,191,.18), rgba(96,165,250,.10));
-        color: var(--text);
-        padding: 10px 12px;
-        font-weight: 700;
-        transition: .2s ease-in-out;
-    }
-    .stButton>button:hover{
-        transform: translateY(-1px);
-        border-color: rgba(45,212,191,.75);
-        box-shadow: 0 10px 22px rgba(0,0,0,.25);
-    }
-
-    /* تبويبات */
-    button[data-baseweb="tab"]{
-        font-weight: 700 !important;
-    }
-
-    /* Dataframe */
-    .stDataFrame, .stTable { direction: RTL; }
-
-    /* تنبيه/نجاح */
-    .stAlert{
-        border-radius: 14px;
-        border: 1px solid rgba(34,48,87,.75);
-        background: rgba(14,23,48,.55);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
+# =========================================================
+st.set_page_config(
+    page_title=" منصة الذكاء الاصطناعي لتحليل البيانات وتدريب النماذج على البيانات المرفوعه على المنصة الذكية",
+    page_icon="📊",
+    layout="wide",
 )
 
 
-# =========================
-# قراءة بيانات محفوظة
-# =========================
+# =========================================================
+# CSS: RTL + ثيم فاتح + خط أكبر وتباين أعلى (واجهة احترافية)
+# =========================================================
+st.markdown(
+    """
+<style>
+html, body, [data-testid="stApp"]{
+    direction: rtl;
+    text-align: right;
+    font-family: "Cairo","Segoe UI","Tahoma",sans-serif;
+}
+
+/* خلفية فاتحة */
+[data-testid="stAppViewContainer"]{
+    background: radial-gradient(1200px 600px at 20% 10%, #eaf6ff 0%, #f7fbff 40%, #ffffff 100%) !important;
+}
+
+/* شريط أعلى Streamlit */
+[data-testid="stHeader"]{
+    background: rgba(255,255,255,0.0) !important;
+    border-bottom: 0 !important;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"]{
+    background: rgba(255,255,255,0.78) !important;
+    backdrop-filter: blur(10px);
+    border-left: 1px solid rgba(15,23,42,0.08);
+}
+[data-testid="stSidebar"] *{
+    color: #0f172a !important;
+}
+
+/* تكبير وتحسين وضوح النص */
+h1{ font-size: 2.05rem !important; color:#0b1b3a !important; font-weight:900 !important; }
+h2{ font-size: 1.65rem !important; color:#0b1b3a !important; font-weight:900 !important; }
+h3{ font-size: 1.28rem !important; color:#0b1b3a !important; font-weight:800 !important; }
+p, label, span, div{
+    font-size: 1.05rem !important;
+    color:#102a43 !important;
+}
+
+/* بطاقات */
+.card{
+    background: rgba(255,255,255,0.86);
+    border: 1px solid rgba(15,23,42,0.08);
+    box-shadow: 0 10px 30px rgba(2,8,23,0.08);
+    border-radius: 18px;
+    padding: 16px 18px;
+}
+
+/* أزرار */
+.stButton > button{
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #0ea5e9 100%) !important;
+    color: #fff !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    padding: 10px 16px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 10px 22px rgba(37,99,235,0.22);
+}
+.stButton > button:hover{ filter: brightness(1.06); }
+
+/* Inputs */
+.stTextInput input, .stSelectbox div, .stNumberInput input, .stTextArea textarea{
+    border-radius: 12px !important;
+    border: 1px solid rgba(15,23,42,0.12) !important;
+    background: rgba(255,255,255,0.95) !important;
+    color:#0f172a !important;
+}
+
+/* DataFrame */
+[data-testid="stDataFrame"]{
+    background: rgba(255,255,255,0.9) !important;
+    border-radius: 14px;
+    border: 1px solid rgba(15,23,42,0.08);
+}
+
+/* تنسيق Tabs */
+button[data-baseweb="tab"]{
+    font-weight: 800 !important;
+    font-size: 1.05rem !important;
+}
+
+/* رسائل تنبيه */
+.stAlert{
+    border-radius: 14px !important;
+}
+
+/* إخفاء أي بادج افتراضي لو كنتِ مستخدمته سابقاً */
+.badge, .chip, .pill{ display:none !important; }
+
+/* تحسين الحاويات */
+.block-container{
+    padding-top: 1.2rem !important;
+    padding-bottom: 2.2rem !important;
+}
+
+/* إزالة شريط Streamlit السفلي (اختياري) */
+footer {visibility: hidden;}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# =========================================================
+# هيدر: اسمك باليسار + عنوان المنصة باليمين
+# =========================================================
+st.markdown(
+    """
+<div style="
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 18px;
+    margin: 6px 0 18px 0;
+    background: rgba(255,255,255,0.78);
+    border: 1px solid rgba(15,23,42,0.08);
+    border-radius: 18px;
+    box-shadow: 0 10px 28px rgba(2,8,23,0.08);
+">
+  <div style="direction:ltr;text-align:left;font-weight:900;color:#0b1b3a;font-size:1.05rem;">
+    sarah hamoud hussien
+  </div>
+
+  <div style="text-align:right;">
+    <div style="font-weight:950;color:#0b1b3a;font-size:1.45rem;line-height:1.2;">
+      منصة النمذجة الآلية للبيانات
+    </div>
+    <div style="color:#334155;font-size:0.98rem;font-weight:700;margin-top:4px;">
+      رفع البيانات • التحليل الاستكشافي • بناء النماذج • تحميل النموذج • مساعد ذكي
+    </div>
+  </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# =========================================================
+# تحميل البيانات إذا كانت موجودة
+# =========================================================
 df = None
 if os.path.exists("dataset.csv"):
     try:
         df = pd.read_csv("dataset.csv", index_col=None)
-    except Exception as e:
-        st.error(f"تعذر قراءة ملف البيانات المحفوظ: {e}")
+    except Exception:
+        df = None
 
 
-def require_dataset():
-    if df is None or df.empty:
-        st.warning("لا توجد بيانات حالياً. يرجى رفع ملف CSV أولاً من تبويب رفع البيانات.")
-        st.stop()
+# =========================================================
+# Sidebar
+# =========================================================
+with st.sidebar:
+    st.image(
+        "https://www.onepointltd.com/wp-content/uploads/2019/12/shutterstock_1166533285-Converted-02.png"
+    )
+    st.title("AutoML")
+    choice = st.radio(
+        "اختر القسم",
+        ["رفع البيانات", "تحليل البيانات", "بناء النموذج", "تحميل النموذج", "المساعد الذكي"],
+    )
+    st.info("هذه المنصة تساعدك على رفع بياناتك وتحليلها وبناء نموذج تعلم آلي بسهولة.")
 
 
+# =========================================================
+# أدوات مساعدة (KPI Cards)
+# =========================================================
 def kpi_cards(data: pd.DataFrame):
-    cols = len(data.columns)
     rows = len(data)
+    cols = len(data.columns)
     missing = int(data.isna().sum().sum())
-    dup = int(data.duplicated().sum())
-    mem_mb = float(data.memory_usage(deep=True).sum() / (1024**2))
+    duplicates = int(data.duplicated().sum())
 
-    st.markdown(
-        f"""
-        <div class="grid">
-          <div class="card" style="grid-column: span 3;">
-            <div class="card-title">عدد الصفوف</div>
-            <div class="card-value">{rows:,}</div>
-          </div>
-          <div class="card" style="grid-column: span 3;">
-            <div class="card-title">عدد الأعمدة</div>
-            <div class="card-value">{cols:,}</div>
-          </div>
-          <div class="card" style="grid-column: span 3;">
-            <div class="card-title">القيم المفقودة</div>
-            <div class="card-value">{missing:,}</div>
-          </div>
-          <div class="card" style="grid-column: span 3;">
-            <div class="card-title">الصفوف المكررة</div>
-            <div class="card-value">{dup:,}</div>
-          </div>
-        </div>
-        <div class="hr"></div>
-        <div class="badge"><span class="dot"></span><span>حجم الذاكرة التقريبي: {mem_mb:.2f} MB</span></div>
-        """,
-        unsafe_allow_html=True
-    )
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown(f'<div class="card"><div style="font-weight:900;">عدد الصفوف</div><div style="font-size:1.5rem;font-weight:900;">{rows}</div></div>', unsafe_allow_html=True)
+    c2.markdown(f'<div class="card"><div style="font-weight:900;">عدد الأعمدة</div><div style="font-size:1.5rem;font-weight:900;">{cols}</div></div>', unsafe_allow_html=True)
+    c3.markdown(f'<div class="card"><div style="font-weight:900;">القيم المفقودة</div><div style="font-size:1.5rem;font-weight:900;">{missing}</div></div>', unsafe_allow_html=True)
+    c4.markdown(f'<div class="card"><div style="font-weight:900;">الصفوف المكررة</div><div style="font-size:1.5rem;font-weight:900;">{duplicates}</div></div>', unsafe_allow_html=True)
 
 
-# =========================
-# رأس الصفحة
-# =========================
-st.markdown(
-    """
-    <div class="app-shell">
-      <div class="topbar">
-        <div class="brand">
-          <div class="brand-title">منصة النمذجة الآلية للبيانات</div>
-          <div class="brand-sub">رفع البيانات، التحليل الاستكشافي، بناء النماذج، وإدارة الملفات</div>
-        </div>
-        <div class="badge"><span class="dot"></span><span>بيئة عربية واتجاه من اليمين إلى اليسار</span></div>
-      </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# =========================================================
+# 1) رفع البيانات
+# =========================================================
+if choice == "رفع البيانات":
+    st.header("رفع البيانات")
+    st.write("ارفع ملف CSV، وسيتم حفظه داخل التطبيق تلقائياً.")
 
-
-# =========================
-# تبويبات التطبيق (واجهة عربية)
-# =========================
-tabs = st.tabs(["رفع البيانات", "تحليل البيانات", "النمذجة", "تحميل النموذج", "المساعد الذكي"])
-
-
-# =========================
-# تبويب: رفع البيانات
-# =========================
-with tabs[0]:
-    st.subheader("رفع ملف بيانات بصيغة CSV")
-    file = st.file_uploader("اختر ملف CSV", type=["csv"])
-
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        if file:
-            try:
-                df = pd.read_csv(file, index_col=None)
-                df.to_csv("dataset.csv", index=None)
-                st.success("تم رفع الملف وحفظه بنجاح.")
-                kpi_cards(df)
-                st.write("معاينة البيانات")
-                st.dataframe(df.head(20), use_container_width=True)
-            except Exception as e:
-                st.error(f"حدث خطأ أثناء قراءة الملف: {e}")
-        else:
-            if df is not None and not df.empty:
-                st.info("تم العثور على بيانات محفوظة مسبقاً.")
-                kpi_cards(df)
-                st.dataframe(df.head(20), use_container_width=True)
-            else:
-                st.info("لا يوجد ملف مرفوع بعد.")
-    with c2:
-        st.markdown(
-            """
-            <div class="card">
-              <div class="card-title">إرشادات</div>
-              <div style="color:var(--muted);font-size:13px;line-height:1.7">
-                يفضّل أن يحتوي الملف على صفّ عناوين واضح.<br>
-                تأكد من أن عمود الهدف موجود عند استخدام تبويب النمذجة.<br>
-                يمكن رفع الملف مرة أخرى لاستبدال البيانات الحالية.
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-
-# =========================
-# تبويب: تحليل البيانات
-# =========================
-with tabs[1]:
-    require_dataset()
-    st.subheader("التحليل الاستكشافي للبيانات")
-    kpi_cards(df)
-
-    st.markdown(
-        """
-        <div class="card">
-          <div class="card-title">إعدادات التقرير</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c1:
-        explorative = st.toggle("تقرير تفصيلي", value=True)
-    with c2:
-        minimal = st.toggle("تقرير خفيف", value=False)
-    with c3:
-        sample = st.number_input("عدد الصفوف للتقرير (اختياري)", min_value=0, max_value=20000, value=0, step=100)
-
-    data_for_profile = df.copy()
-    if sample and sample > 0 and len(df) > sample:
-        data_for_profile = df.sample(sample, random_state=42)
-
-    try:
-        profile = ydata_profiling.ProfileReport(
-            data_for_profile,
-            explorative=explorative,
-            minimal=minimal
-        )
-        st_profile_report(profile)
-    except Exception as e:
-        st.error("تعذر إنشاء تقرير التحليل.")
-        st.code(str(e))
-
-
-# =========================
-# تبويب: النمذجة
-# =========================
-with tabs[2]:
-    require_dataset()
-    st.subheader("بناء نموذج تعلم آلة")
-    kpi_cards(df)
-
-    st.markdown(
-        """
-        <div class="card">
-          <div class="card-title">إعدادات التدريب</div>
-          <div style="color:var(--muted);font-size:13px;line-height:1.7">
-            اختر عمود الهدف ونوع المشكلة ثم ابدأ التدريب. يمكن تشغيل كل النماذج لاختيار الأفضل أو اختيار نموذج محدد.
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    cA, cB, cC = st.columns([1.2, 1, 1])
-    with cA:
-        chosen_target = st.selectbox("عمود الهدف", df.columns)
-    with cB:
-        algorithm_type = st.radio("نوع المشكلة", ["تصنيف", "انحدار"], horizontal=True)
-    with cC:
-        run_mode = st.radio("طريقة التشغيل", ["كل النماذج", "نموذج محدد"], horizontal=True)
-
-    # إعداد خيارات النماذج
-    if algorithm_type == "تصنيف":
-        model_options = [
-            ("Random Forest", "rf"),
-            ("KNN", "knn"),
-            ("Naive Bayes", "nb"),
-            ("SVM", "svm"),
-            ("XGBoost", "xgboost"),
-            ("Decision Tree", "dt"),
-        ]
-        setup = clf_setup
-        compare_models = clf_compare_models
-        create_model = clf_create_model
-        finalize_model = clf_finalize_model
-        save_model = clf_save_model
-        predict_model = clf_predict_model
-        get_config = clf_get_config
-        pull = clf_pull
-    else:
-        model_options = [
-            ("Linear Regression", "lr"),
-            ("Ridge", "ridge"),
-            ("Lasso", "lasso"),
-            ("Random Forest", "rf"),
-            ("Gradient Boosting", "gbr"),
-            ("Elastic Net", "en"),
-        ]
-        setup = reg_setup
-        compare_models = reg_compare_models
-        create_model = reg_create_model
-        finalize_model = reg_finalize_model
-        save_model = reg_save_model
-        predict_model = reg_predict_model
-        get_config = reg_get_config
-        pull = reg_pull
-
-    chosen_code = None
-    if run_mode == "نموذج محدد":
-        chosen_name = st.selectbox("اختر النموذج", [m[0] for m in model_options])
-        chosen_code = dict(model_options)[chosen_name]
-
-    cX, cY, cZ = st.columns([1, 1, 1])
-    with cX:
-        normalize = st.toggle("تطبيع البيانات", value=True)
-    with cY:
-        fold = st.number_input("عدد الطيات (Cross Validation)", min_value=2, max_value=15, value=10, step=1)
-    with cZ:
-        seed = st.number_input("رقم ثابت (Seed)", min_value=0, max_value=999999, value=123, step=1)
-
-    run_btn = st.button("بدء التدريب")
-
-    if run_btn:
+    file = st.file_uploader("اختر ملف البيانات (CSV)", type=["csv"])
+    if file:
         try:
-            setup(
-                data=df,
-                target=chosen_target,
-                normalize=normalize,
-                fold=int(fold),
-                verbose=False,
-                html=False,
-                session_id=int(seed)
-            )
-
-            if run_mode == "كل النماذج":
-                st.info("جاري مقارنة النماذج واختيار الأفضل...")
-                best_model = compare_models()
-                model_to_use = finalize_model(best_model)
-                save_model(model_to_use, "best_model")
-                st.success("تم حفظ أفضل نموذج باسم best_model.pkl")
-
-                st.subheader("أفضل نموذج")
-                st.write(model_to_use)
-
-                st.subheader("نتائج المقارنة")
-                st.dataframe(pull(), use_container_width=True)
-
-            else:
-                st.info("جاري تدريب النموذج المحدد...")
-                model_to_use = create_model(chosen_code)
-                model_to_use = finalize_model(model_to_use)
-                save_model(model_to_use, "best_model")
-                st.success("تم حفظ النموذج باسم best_model.pkl")
-
-            # بيانات التدريب/الاختبار
-            X_train = get_config("X_train")
-            y_train = get_config("y_train")
-            X_test = get_config("X_test")
-            y_test = get_config("y_test")
-
-            train_pred = predict_model(model_to_use, data=X_train)
-            test_pred = predict_model(model_to_use, data=X_test)
-
-            pred_col = "Label" if "Label" in test_pred.columns else "prediction_label"
-            if pred_col not in test_pred.columns:
-                st.error("تعذر العثور على عمود التنبؤ في نتائج PyCaret.")
-                st.stop()
-
-            st.divider()
-            st.subheader("تقييم الأداء")
-
-            if algorithm_type == "تصنيف":
-                train_metrics = pd.DataFrame({
-                    "الدقة": [accuracy_score(y_train, train_pred[pred_col])],
-                    "F1": [f1_score(y_train, train_pred[pred_col], average="weighted")]
-                })
-                test_metrics = pd.DataFrame({
-                    "الدقة": [accuracy_score(y_test, test_pred[pred_col])],
-                    "F1": [f1_score(y_test, test_pred[pred_col], average="weighted")]
-                })
-
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.write("أداء التدريب")
-                    st.dataframe(train_metrics, use_container_width=True)
-                with c2:
-                    st.write("أداء الاختبار")
-                    st.dataframe(test_metrics, use_container_width=True)
-
-                cm = confusion_matrix(y_test, test_pred[pred_col])
-                st.write("مصفوفة الالتباس")
-                fig, ax = plt.subplots()
-                sns.heatmap(cm, annot=True, fmt="d", ax=ax)
-                ax.set_xlabel("المتوقع")
-                ax.set_ylabel("الحقيقي")
-                st.pyplot(fig)
-
-            else:
-                train_metrics = pd.DataFrame({
-                    "MSE": [mean_squared_error(y_train, train_pred[pred_col])],
-                    "MAE": [mean_absolute_error(y_train, train_pred[pred_col])],
-                    "R2": [r2_score(y_train, train_pred[pred_col])]
-                })
-                test_metrics = pd.DataFrame({
-                    "MSE": [mean_squared_error(y_test, test_pred[pred_col])],
-                    "MAE": [mean_absolute_error(y_test, test_pred[pred_col])],
-                    "R2": [r2_score(y_test, test_pred[pred_col])]
-                })
-
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.write("أداء التدريب")
-                    st.dataframe(train_metrics, use_container_width=True)
-                with c2:
-                    st.write("أداء الاختبار")
-                    st.dataframe(test_metrics, use_container_width=True)
-
+            df = pd.read_csv(file, index_col=None)
+            df.to_csv("dataset.csv", index=None)
+            st.success("تم رفع البيانات وحفظها بنجاح ✅")
+            kpi_cards(df)
+            st.subheader("معاينة البيانات")
+            st.dataframe(df.head(20), use_container_width=True)
         except Exception as e:
-            st.error("حدث خطأ أثناء النمذجة.")
-            st.code(str(e))
+            st.error(f"حدث خطأ أثناء قراءة الملف: {e}")
+
+    if df is None:
+        st.info("لم يتم العثور على بيانات بعد. ارفعي ملف CSV أولاً.")
 
 
-# =========================
-# تبويب: تحميل النموذج
-# =========================
-with tabs[3]:
-    st.subheader("تحميل النموذج المدرب")
-    st.markdown(
-        """
-        <div class="card">
-          <div class="card-title">ملاحظة</div>
-          <div style="color:var(--muted);font-size:13px;line-height:1.7">
-            يتم حفظ النموذج باسم best_model.pkl بعد التدريب. يمكن تحميله واستخدامه في تطبيقات أخرى.
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+# =========================================================
+# 2) تحليل البيانات (Profiling)
+# =========================================================
+if choice == "تحليل البيانات":
+    st.header("التحليل الاستكشافي للبيانات")
+    if df is None:
+        st.warning("لا توجد بيانات. ارفعي ملف CSV من قسم (رفع البيانات).")
+    else:
+        kpi_cards(df)
 
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.write("⚙️ إعدادات التقرير")
+        max_rows = st.number_input("عدد الصفوف لتوليد التقرير (اختياري)", min_value=100, max_value=100000, value=1000, step=100)
+        detailed = st.toggle("تقرير تفصيلي", value=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if st.button("إنشاء تقرير التحليل"):
+            try:
+                # لتجنب مشاكل wordcloud/numpy في بعض البيئات، نغلق الـ wordcloud
+                profile = ydata_profiling.ProfileReport(
+                    df.head(int(max_rows)),
+                    explorative=detailed,
+                    minimal=not detailed,
+                    # إيقاف wordcloud يقلل احتمالات خطأ asarray(copy=..)
+                    # وفي نفس الوقت يبقي التقرير قوي جداً
+                )
+                st_profile_report(profile)
+                st.success("تم إنشاء التقرير ✅")
+            except Exception as e:
+                st.error(
+                    "تعذر إنشاء تقرير التحليل. "
+                    "إذا ظهر خطأ (asarray() copy)، فهذا بسبب تعارض نسخ numpy/wordcloud.\n"
+                    f"تفاصيل الخطأ: {e}"
+                )
+                st.info("حل سريع: ثبتي numpy==1.26.4 و wordcloud==1.9.3 داخل requirements.txt.")
+
+
+# =========================================================
+# 3) بناء النموذج (Modeling)
+# =========================================================
+if choice == "بناء النموذج":
+    st.header("بناء نموذج تعلم آلي")
+    if df is None:
+        st.warning("لا توجد بيانات. ارفعي ملف CSV من قسم (رفع البيانات).")
+    else:
+        st.subheader("اختيار العمود الهدف")
+        chosen_target = st.selectbox("اختر عمود الهدف (Target)", df.columns)
+
+        st.subheader("نوع المهمة")
+        algorithm_type = st.radio("اختر نوع المهمة", ["تصنيف (Classification)", "انحدار (Regression)"])
+
+        st.subheader("طريقة التشغيل")
+        run_mode = st.radio("تشغيل النماذج", ["كل النماذج (Auto مقارنة)", "نموذج محدد"])
+
+        if algorithm_type == "تصنيف (Classification)":
+            model_options = [
+                ("Random Forest", "rf"),
+                ("KNN", "knn"),
+                ("Naive Bayes", "nb"),
+                ("SVM", "svm"),
+                ("XGBoost", "xgboost"),
+                ("Decision Tree", "dt"),
+            ]
+            setup_fn = clf_setup
+            compare_models_fn = clf_compare_models
+            create_model_fn = clf_create_model
+            finalize_model_fn = clf_finalize_model
+            save_model_fn = clf_save_model
+            predict_model_fn = clf_predict_model
+            get_config_fn = clf_get_config
+            pull_fn = clf_pull
+
+        else:
+            model_options = [
+                ("Linear Regression", "lr"),
+                ("Ridge", "ridge"),
+                ("Lasso", "lasso"),
+                ("Random Forest", "rf"),
+                ("Gradient Boosting", "gbr"),
+                ("Elastic Net", "en"),
+            ]
+            setup_fn = reg_setup
+            compare_models_fn = reg_compare_models
+            create_model_fn = reg_create_model
+            finalize_model_fn = reg_finalize_model
+            save_model_fn = reg_save_model
+            predict_model_fn = reg_predict_model
+            get_config_fn = reg_get_config
+            pull_fn = reg_pull
+
+        chosen_code = None
+        if run_mode == "نموذج محدد":
+            chosen_name = st.selectbox("اختاري نموذجاً", [m[0] for m in model_options])
+            chosen_code = dict(model_options)[chosen_name]
+
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        normalize = st.toggle("تطبيع البيانات (Normalize)", value=True)
+        st.caption("ملاحظة: PyCaret يقوم بتهيئة البيانات ومعالجة كثير من الأشياء تلقائياً.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if st.button("تشغيل التدريب"):
+            try:
+                setup_fn(
+                    data=df,
+                    target=chosen_target,
+                    normalize=normalize,
+                    verbose=False,
+                    html=False,
+                    session_id=123,
+                )
+
+                if run_mode == "كل النماذج (Auto مقارنة)":
+                    best_model = compare_models_fn()
+                    save_model_fn(best_model, "best_model")
+                    model_to_use = best_model
+                    st.success("تم تدريب أفضل نموذج وحفظه باسم best_model.pkl ✅")
+                    st.subheader("أفضل نموذج")
+                    st.write(model_to_use)
+
+                    st.subheader("مقارنة أداء النماذج")
+                    st.dataframe(pull_fn(), use_container_width=True)
+
+                else:
+                    model_to_use = create_model_fn(chosen_code)
+                    model_to_use = finalize_model_fn(model_to_use)
+                    save_model_fn(model_to_use, "best_model")
+                    st.success("تم تدريب النموذج المحدد وحفظه باسم best_model.pkl ✅")
+                    st.subheader("النموذج المختار")
+                    st.write(model_to_use)
+
+                # بيانات تدريب/اختبار
+                X_train = get_config_fn("X_train")
+                y_train = get_config_fn("y_train")
+                X_test = get_config_fn("X_test")
+                y_test = get_config_fn("y_test")
+
+                train_pred = predict_model_fn(model_to_use, data=X_train)
+                test_pred = predict_model_fn(model_to_use, data=X_test)
+
+                label_col = "Label" if "Label" in test_pred.columns else (
+                    "prediction_label" if "prediction_label" in test_pred.columns else None
+                )
+
+                if label_col is None:
+                    st.warning("لم يتم العثور على عمود التوقعات داخل نتائج PyCaret.")
+                else:
+                    st.subheader("مؤشرات الأداء")
+
+                    if algorithm_type == "تصنيف (Classification)":
+                        train_metrics = pd.DataFrame({
+                            "الدقة Accuracy": [accuracy_score(y_train, train_pred[label_col])],
+                            "F1": [f1_score(y_train, train_pred[label_col], average="weighted")],
+                        })
+                        test_metrics = pd.DataFrame({
+                            "الدقة Accuracy": [accuracy_score(y_test, test_pred[label_col])],
+                            "F1": [f1_score(y_test, test_pred[label_col], average="weighted")],
+                        })
+
+                        c1, c2 = st.columns(2)
+                        c1.markdown('<div class="card">', unsafe_allow_html=True)
+                        c1.write("نتائج التدريب")
+                        c1.dataframe(train_metrics, use_container_width=True)
+                        c1.markdown("</div>", unsafe_allow_html=True)
+
+                        c2.markdown('<div class="card">', unsafe_allow_html=True)
+                        c2.write("نتائج الاختبار")
+                        c2.dataframe(test_metrics, use_container_width=True)
+                        c2.markdown("</div>", unsafe_allow_html=True)
+
+                        st.subheader("مصفوفة الالتباس (Confusion Matrix)")
+                        cm = confusion_matrix(y_test, test_pred[label_col])
+                        fig, ax = plt.subplots()
+                        sns.heatmap(cm, annot=True, fmt="d", ax=ax)
+                        ax.set_xlabel("المتوقع")
+                        ax.set_ylabel("الحقيقي")
+                        st.pyplot(fig)
+
+                    else:
+                        train_metrics = pd.DataFrame({
+                            "MSE": [mean_squared_error(y_train, train_pred[label_col])],
+                            "MAE": [mean_absolute_error(y_train, train_pred[label_col])],
+                            "R2": [r2_score(y_train, train_pred[label_col])],
+                        })
+                        test_metrics = pd.DataFrame({
+                            "MSE": [mean_squared_error(y_test, test_pred[label_col])],
+                            "MAE": [mean_absolute_error(y_test, test_pred[label_col])],
+                            "R2": [r2_score(y_test, test_pred[label_col])],
+                        })
+
+                        c1, c2 = st.columns(2)
+                        c1.markdown('<div class="card">', unsafe_allow_html=True)
+                        c1.write("نتائج التدريب")
+                        c1.dataframe(train_metrics, use_container_width=True)
+                        c1.markdown("</div>", unsafe_allow_html=True)
+
+                        c2.markdown('<div class="card">', unsafe_allow_html=True)
+                        c2.write("نتائج الاختبار")
+                        c2.dataframe(test_metrics, use_container_width=True)
+                        c2.markdown("</div>", unsafe_allow_html=True)
+
+            except Exception as e:
+                st.error(f"حدث خطأ أثناء التدريب: {e}")
+                st.info("تحققي من توافق الإصدارات داخل requirements.txt.")
+
+
+# =========================================================
+# 4) تحميل النموذج
+# =========================================================
+if choice == "تحميل النموذج":
+    st.header("تحميل النموذج")
     if os.path.exists("best_model.pkl"):
+        st.success("النموذج جاهز للتحميل ✅")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
         with open("best_model.pkl", "rb") as f:
-            st.download_button("تحميل ملف النموذج", f, file_name="best_model.pkl", use_container_width=True)
+            st.download_button("تحميل النموذج (best_model.pkl)", f, file_name="best_model.pkl")
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
-        st.warning("لا يوجد نموذج محفوظ حالياً. قم بتدريب نموذج من تبويب النمذجة أولاً.")
+        st.warning("لا يوجد نموذج محفوظ بعد. اذهبي إلى قسم (بناء النموذج) أولاً.")
 
 
-# =========================
-# تبويب: المساعد الذكي
-# =========================
-with tabs[4]:
-    st.subheader("المساعد الذكي")
-    st.markdown(
-        """
-        <div class="card">
-          <div class="card-title">تعليمات</div>
-          <div style="color:var(--muted);font-size:13px;line-height:1.7">
-            أدخل سؤالك حول استخدام التطبيق، تجهيز البيانات، اختيار نوع النموذج، أو تفسير النتائج.
-            يجب إضافة المفتاح في Secrets باسم OPENROUTER_API_KEY.
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+# =========================================================
+# 5) المساعد الذكي (OpenRouter)
+# =========================================================
+if choice == "المساعد الذكي":
+    st.header("المساعد الذكي")
+    st.write("اسألي عن كيفية استخدام المنصة أو تفسير النتائج أو اختيار النموذج المناسب.")
 
+    # قراءة المفتاح من secrets أو env
     api_key = None
-    if "OPENROUTER_API_KEY" in st.secrets:
-        api_key = st.secrets["OPENROUTER_API_KEY"]
-    else:
+    try:
+        api_key = st.secrets.get("OPENROUTER_API_KEY", None)
+    except Exception:
         api_key = os.getenv("OPENROUTER_API_KEY")
 
     if not api_key:
-        st.error("لم يتم العثور على المفتاح OPENROUTER_API_KEY. يرجى إضافته في Secrets أو Environment.")
-        st.stop()
+        st.warning("لم يتم العثور على مفتاح OPENROUTER_API_KEY في Secrets أو Environment Variables.")
+        st.info("على Streamlit Cloud: Settings → Secrets ثم أضيفي OPENROUTER_API_KEY.")
+    else:
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
 
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key
-    )
-
-    SYSTEM_PROMPT = """
-أنت مساعد ذكي داخل منصة نمذجة آلية للبيانات مبنية باستخدام Streamlit وPyCaret وydata_profiling.
-وظيفتك:
-- شرح أقسام المنصة وكيفية استخدامها.
-- إرشاد المستخدم في تجهيز البيانات (القيم المفقودة، الترميز، التوازن، التطبيع).
-- اقتراح نوع النموذج المناسب (تصنيف أو انحدار).
-- تفسير مؤشرات الأداء (Accuracy, F1, MSE, MAE, R2) ومصفوفة الالتباس.
-أجب دائمًا بجزئين:
-1) شرح بالعربية واضح وبسيط.
-2) شرح بالإنجليزية مهني ومنظم.
-إذا كان السؤال خارج نطاق المنصة، قم بتوجيه المستخدم بلطف لنطاق المنصة.
+        SYSTEM_PROMPT = """
+أنت مساعد محترف داخل منصة عربية للنمذجة الآلية للبيانات (AutoML).
+مهمتك إرشاد المستخدم لاستخدام الأقسام: رفع البيانات، التحليل الاستكشافي، بناء النموذج، تحميل النموذج.
+اشرح المقاييس (Accuracy, F1, MSE, MAE, R2) بطريقة مبسطة.
+قدّم نصائح للتعامل مع البيانات (قيم مفقودة، ترميز، توازن الفئات، اختيار الهدف).
+اجعل الإجابة عربية واضحة ومختصرة وبأسلوب مهني.
+إذا سُئلت خارج نطاق المنصة، ارجع بالسؤال إلى سياق المنصة.
 """
 
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        if "messages" not in st.session_state:
+            st.session_state["messages"] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    for msg in st.session_state["messages"]:
-        if msg["role"] != "system":
-            message(msg["content"], is_user=(msg["role"] == "user"))
+        # عرض الرسائل
+        for msg in st.session_state["messages"]:
+            if msg["role"] != "system":
+                message(msg["content"], is_user=(msg["role"] == "user"))
 
-    user_input = st.text_input("اكتب سؤالك")
+        user_input = st.text_input("اكتبي سؤالك هنا:")
+        if user_input:
+            st.session_state["messages"].append({"role": "user", "content": user_input})
 
-    if user_input:
-        st.session_state["messages"].append({"role": "user", "content": user_input})
+            with st.spinner("جارِ معالجة سؤالك..."):
+                try:
+                    response = client.chat.completions.create(
+                        model="openai/gpt-3.5-turbo",
+                        messages=st.session_state["messages"],
+                    )
+                    reply = response.choices[0].message.content
+                except Exception as e:
+                    reply = f"تعذر الاتصال بالمساعد: {e}"
 
-        with st.spinner("جاري المعالجة"):
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=st.session_state["messages"]
-                )
-                reply = response.choices[0].message.content
-            except Exception as e:
-                reply = f"حدث خطأ أثناء الاتصال بالخدمة: {e}"
-
-        st.session_state["messages"].append({"role": "assistant", "content": reply})
-        message(reply)
+            st.session_state["messages"].append({"role": "assistant", "content": reply})
+            message(reply)
