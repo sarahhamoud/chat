@@ -156,7 +156,7 @@ section[data-testid="stSidebar"] .block-container {
 st.markdown(f"""
 <div class="topbar">
   <div>
-    <div class="brand-title"> AutoML المنصة الذكية</div>
+    <div class="brand-title"> AutoML المنصة الذكية لرفع البيانات وتحليلها</div>
     <div class="brand-sub">رفع بيانات • تحليل استكشافي • تدريب نماذج • تحميل النموذج • مساعد ذكي</div>
   </div>
   <div class="owner">sarah hamoud hussien</div>
@@ -239,18 +239,32 @@ if choice == "تحليل البيانات":
     kpi_row(df)
     st.dataframe(df.head(10), use_container_width=True)
 
-    minimal = st.toggle("وضع سريع (أخف)", value=True)
-    rows = st.number_input("عدد الصفوف للتقرير (لتخفيف الحمل)", min_value=100, max_value=200000, value=5000, step=500)
+    minimal = st.toggle("وضع سريع (أخف)", value=True, key="eda_minimal")
+    rows = st.number_input("عدد الصفوف للتقرير (لتخفيف الحمل)", min_value=100, max_value=200000, value=5000, step=500, key="eda_rows")
+
     data_for_report = df.head(int(rows))
 
-    # خيار (اختياري) حذف الأعمدة النصية الثقيلة لتجنب أعطال wordcloud
-    drop_text = st.toggle("تجاهل الأعمدة النصية الثقيلة (لتفادي أعطال)", value=True)
+    drop_text = st.toggle("تجاهل الأعمدة النصية الثقيلة (لتفادي أعطال)", value=True, key="eda_drop_text")
     if drop_text:
         text_cols = [c for c in data_for_report.columns if data_for_report[c].dtype == "object"]
         if len(text_cols) > 0:
             data_for_report = data_for_report.drop(columns=text_cols)
 
-    if st.button("إنشاء تقرير التحليل"):
+    # ✅ مكان لحفظ التقرير داخل الجلسة
+    if "profile_html" not in st.session_state:
+        st.session_state["profile_html"] = None
+
+    colA, colB = st.columns([1,1])
+    with colA:
+        create_btn = st.button("إنشاء التقرير", key="btn_make_report")
+    with colB:
+        clear_btn = st.button("مسح التقرير", key="btn_clear_report")
+
+    if clear_btn:
+        st.session_state["profile_html"] = None
+        st.success("تم مسح التقرير من الجلسة.")
+
+    if create_btn:
         with st.spinner("⏳ جاري إنشاء التقرير..."):
             try:
                 profile = ydata_profiling.ProfileReport(
@@ -258,18 +272,32 @@ if choice == "تحليل البيانات":
                     explorative=True,
                     minimal=bool(minimal),
                 )
-                st.success("✅ تم إنشاء التقرير بنجاح.")
 
-                # Render via component
-                try:
-                    st_profile_report(profile)
-                except Exception as e:
-                    st.warning(f"تعذر العرض بالمكوّن، سيتم العرض كـ HTML مباشرة. السبب: {e}")
-                    html = profile.to_html()
-                    st.components.v1.html(html, height=900, scrolling=True)
+                # ✅ أهم خطوة: تحويله إلى HTML وحفظه
+                st.session_state["profile_html"] = profile.to_html()
+                st.success("✅ تم إنشاء التقرير وحفظه. سيظهر أدناه ولن يختفي.")
 
             except Exception as e:
                 st.error(f"فشل إنشاء التقرير: {e}")
+                st.stop()
+
+    # ✅ عرض التقرير إذا موجود
+    if st.session_state["profile_html"]:
+        st.markdown('<div class="card"><h3>عرض التقرير</h3><div class="small">إذا لم يظهر داخل الإطار، استخدمي زر التحميل وافتحيه محليًا.</div></div>', unsafe_allow_html=True)
+
+        st.download_button(
+            "⬇️ تحميل تقرير التحليل (HTML)",
+            data=st.session_state["profile_html"].encode("utf-8"),
+            file_name="profiling_report.html",
+            mime="text/html",
+            key="download_profile_html"
+        )
+
+        # عرض داخل التطبيق
+        st.components.v1.html(st.session_state["profile_html"], height=900, scrolling=True)
+    else:
+        st.info("لا يوجد تقرير معروض الآن. اضغطي (إنشاء التقرير).")
+
 
 # =========================
 # Modeling
@@ -503,4 +531,5 @@ if choice == "المساعد الذكي":
 
         st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
         message(reply, key=f"chat_{len(st.session_state['chat_messages'])}")
+
 
