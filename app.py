@@ -180,7 +180,7 @@ st.markdown(
 
   <div style="text-align:right;">
     <div style="font-weight:950;color:#0b1b3a;font-size:1.45rem;line-height:1.2;">
-      منصة النمذجة الآلية للبيانات
+      منصة الذكاء الاصطناعي لتحليل البيانات وتدريب النماذج على البيانات المرفوعه على المنصة الذكية
     </div>
     <div style="color:#334155;font-size:0.98rem;font-weight:700;margin-top:4px;">
       رفع البيانات • التحليل الاستكشافي • بناء النماذج • تحميل النموذج • مساعد ذكي
@@ -533,3 +533,4 @@ if choice == "المساعد الذكي":
 
             st.session_state["messages"].append({"role": "assistant", "content": reply})
             message(reply)
+
