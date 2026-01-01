@@ -270,43 +270,29 @@ if choice == "رفع البيانات":
 # =========================
 # 2) تحليل البيانات (Profiling)
 # =========================
-elif choice == "تحليل البيانات":
-    st.markdown("## التحليل الاستكشافي للبيانات")
+if choice == "تحليل البيانات":
+    st.title("التحليل الاستكشافي للبيانات")
     require_df()
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     kpi_row(df)
 
-    st.markdown("### إعدادات التقرير")
-    colA, colB, colC = st.columns([1, 1, 1])
+    minimal = st.toggle("وضع سريع (أخف)", value=True)
+    samples = st.number_input("عدد الصفوف للتقرير (اختياري)", 0, 200000, 0, 1000)
 
-    with colA:
-        minimal = st.toggle("وضع سريع (أخف)", value=True, help="يقلل بعض الرسوم لتسريع التقرير")
-    with colB:
-        samples = st.number_input("عدد الصفوف للتقرير (اختياري)", min_value=0, max_value=200000, value=0, step=1000)
-    with colC:
-        run_report = st.button("إنشاء التقرير")
+    if st.button("إنشاء التقرير"):
+        data_for_report = df
+        if samples and samples > 0:
+            data_for_report = df.head(int(samples))
 
-    st.divider()
+        # حل مشاكل النصوص/wordcloud + تخفيف الحمل
+        profile = ydata_profiling.ProfileReport(
+            data_for_report,
+            explorative=True,
+            minimal=minimal,
+            config={"variables": {"text": {"word_counts": False}}}
+        )
+        st_profile_report(profile)
 
-    if run_report:
-        try:
-            data_for_report = df
-            if samples and samples > 0:
-                data_for_report = df.head(int(samples))
-
-            # تقليل مشاكل wordcloud عند وجود أعمدة نصية كثيفة
-            profile = ydata_profiling.ProfileReport(
-                data_for_report,
-                explorative=True,
-                minimal=minimal,
-            )
-            st_profile_report(profile)
-        except Exception as e:
-            st.error("تعذر إنشاء تقرير التحليل.")
-            st.code(str(e))
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================
 # 3) بناء النماذج (PyCaret)
@@ -573,4 +559,5 @@ elif choice == "المساعد":
         st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
