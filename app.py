@@ -270,30 +270,26 @@ if choice == "رفع البيانات":
 # =========================
 # 2) تحليل البيانات (Profiling)
 # =========================
-if choice == "تحليل البيانات":
-    st.title("التحليل الاستكشافي للبيانات")
-    require_df()
+if choice == "Profiling":
+    st.title("التحليل الاستكشافي للبيانات (EDA)")
 
-    kpi_row(df)
+    if "df" not in globals() or df is None or df.empty:
+        st.error("لا توجد بيانات. يرجى رفع ملف CSV أولاً.")
+        st.stop()
 
+    # خيار تخفيف التقرير
     minimal = st.toggle("وضع سريع (أخف)", value=True)
-    samples = st.number_input("عدد الصفوف للتقرير (اختياري)", 0, 200000, 0, 1000)
+    rows = st.number_input("عدد الصفوف للتقرير (اختياري)", min_value=0, max_value=200000, value=5000, step=1000)
 
-    if st.button("إنشاء التقرير"):
-        data_for_report = df
-        if samples and samples > 0:
-            data_for_report = df.head(int(samples))
+    data_for_report = df.head(int(rows)) if rows and rows > 0 else df
 
-        # حل مشاكل النصوص/wordcloud + تخفيف الحمل
+    with st.spinner("جاري إنشاء التقرير..."):
         profile = ydata_profiling.ProfileReport(
             data_for_report,
             explorative=True,
-            minimal=minimal,
-            config={"variables": {"text": {"word_counts": False}}}
+            minimal=bool(minimal)
         )
         st_profile_report(profile)
-
-
 # =========================
 # 3) بناء النماذج (PyCaret)
 # =========================
@@ -559,5 +555,6 @@ elif choice == "المساعد":
         st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 
