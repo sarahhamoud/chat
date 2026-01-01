@@ -156,7 +156,7 @@ section[data-testid="stSidebar"] .block-container {
 st.markdown(f"""
 <div class="topbar">
   <div>
-    <div class="brand-title">منصة AutoML الذكية</div>
+    <div class="brand-title"> AutoML المنصة الذكية</div>
     <div class="brand-sub">رفع بيانات • تحليل استكشافي • تدريب نماذج • تحميل النموذج • مساعد ذكي</div>
   </div>
   <div class="owner">sarah hamoud hussien</div>
@@ -503,3 +503,4 @@ if choice == "المساعد الذكي":
 
         st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
         message(reply, key=f"chat_{len(st.session_state['chat_messages'])}")
+
