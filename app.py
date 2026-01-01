@@ -46,7 +46,7 @@ from openai import OpenAI
 # إعدادات الصفحة
 # =========================
 st.set_page_config(
-    page_title="منصة النمذجة الآلية للبيانات",
+    page_title="منصة الذكاء الاصطناعي  ",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -189,7 +189,7 @@ st.markdown(
   <div class="header-grid">
     <div class="user-name">sarah hamoud hussien</div>
     <div>
-      <div class="brand-title">منصة النمذجة الآلية للبيانات</div>
+      <div class="brand-title">منصة الذكاء الاصطناعي وتحليل البيانات   </div>
       <div class="brand-sub">رفع البيانات • التحليل الاستكشافي • بناء النماذج • تحميل النموذج • المساعد</div>
     </div>
   </div>
@@ -573,3 +573,4 @@ elif choice == "المساعد":
         st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
+
